@@ -1,7 +1,7 @@
 {
-  "name": "discord-livechat-bot",
+  "name": "discord-multibot-chat",
   "version": "1.0.0",
-  "description": "Discord Bot Livechat Dashboard",
+  "description": "Multi-Bot Discord Livechat Dashboard",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -9,7 +9,7 @@
   "dependencies": {
     "discord.js": "^14.14.1",
     "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
     "socket.io": "^4.7.5"
   }
 }
-
