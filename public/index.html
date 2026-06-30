@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Multi-Bot Live Chat Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { display: flex; height: 100vh; background-color: #f4f6f9; color: #333; }
+        
+        /* Cột quản lý Token Bot */
+        #bot-manager { width: 260px; background: #2f3136; color: white; padding: 15px; display: flex; flex-direction: column; gap: 15px; }
+        #bot-manager h3 { font-size: 1rem; border-bottom: 1px solid #4f545c; padding-bottom: 8px; }
+        .bot-input-group { display: flex; flex-direction: column; gap: 8px; }
+        .bot-input-group input { padding: 8px; border-radius: 4px; border: none; outline: none; font-size: 0.85rem; }
+        .bot-input-group button { background: #43b581; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .bot-item { padding: 8px; background: #40444b; border-radius: 4px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;}
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #747f8d; }
+        .status-dot.online { background: #43b581; }
+
+        /* Cột danh sách đoạn chat */
+        #sidebar { width: 300px; background: #fff; border-right: 1px solid #e1e4e8; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 15px; border-bottom: 1px solid #e1e4e8; font-weight: bold; }
+        .channel-list { flex: 1; overflow-y: auto; }
+        .channel-item { display: flex; align-items: center; padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #f0f2f5; position: relative; }
+        .channel-item.active { background: #edf0f7; border-left: 4px solid #5865F2; }
+        .channel-info { flex: 1; min-width: 0; }
+        .channel-name { font-weight: 600; font-size: 0.9rem; }
+        .bot-badge { font-size: 0.7rem; color: #5865F2; background: #e8eaff; padding: 1px 4px; border-radius: 3px; font-weight: normal; }
+        .channel-lastmsg { font-size: 0.8rem; color: #777; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .unread-dot { width: 8px; height: 8px; background: #ff4d4f; border-radius: 50%; position: absolute; right: 15px; }
+
+        /* Khung chat */
+        #chat-area { flex: 1; display: flex; flex-direction: column; background: #fafbfc; }
+        .chat-header { padding: 15px 20px; background: #fff; border-bottom: 1px solid #e1e4e8; font-weight: 600; }
+        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        .msg-wrapper { display: flex; max-width: 70%; }
+        .msg-wrapper.self { align-self: flex-end; }
+        .msg-box { background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 0.9rem; }
+        .msg-wrapper.self .msg-box { background: #5865F2; color: #fff; }
+        
+        /* Bộ gõ chân trang có kèm chọn file */
+        .chat-footer { padding: 15px; background: #fff; border-top: 1px solid #e1e4e8; display: flex; gap: 10px; align-items: center; }
+        .chat-footer input[type="text"] { flex: 1; padding: 10px 15px; border: 1px solid #dcdfe6; border-radius: 20px; outline: none; }
+        .file-label { cursor: pointer; padding: 8px; background: #f0f2f5; border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .chat-footer button { background: #5865F2; color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        .no-chat-selected { display: flex; align-items: center; justify-content: center; height: 100%; color: #aaa; }
+        #file-preview { font-size: 0.8rem; color: #5865F2; padding: 0 15px; display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="bot-manager">
+        <h3>QUẢN LÝ ACC BOT</h3>
+        <div class="bot-input-group">
+            <input type="text" id="bot-token-input" placeholder="Dán Token Bot vào đây...">
+            <button onclick="addBotAccount()">Thêm & Kết nối</button>
+        </div>
+        <div style="font-size: 0.8rem; color: #b9bbbe;">Danh sách Bot:</div>
+        <div id="bot-list-container" style="display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1;"></div>
+    </div>
+
+    <div id="sidebar">
+        <div class="sidebar-header">Đoạn Chat Live</div>
+        <div class="channel-list" id="channels"></div>
+    </div>
+
+    <div id="chat-area">
+        <div id="chat-active-container" style="display: none; height: 100%; flex-direction: column;">
+            <div class="chat-header" id="current-channel-title">Tên Phòng Chat</div>
+            <div class="chat-messages" id="chat-messages"></div>
+            <div id="file-preview">📎 Đang chọn file: <span id="file-name-text"></span> <b style="cursor:pointer;color:red" onclick="clearFile()">[Xóa]</b></div>
+            <div class="chat-footer">
+                <label class="file-label" title="Chọn ảnh hoặc file gửi lên Discord">
+                    📁 <input type="file" id="file-input" style="display:none;" onchange="fileSelected()">
+                </label>
+                <input type="text" id="input-message" placeholder="Nhập nội dung phản hồi..." onkeypress="if(event.key === 'Enter') sendMessage()">
+                <button onclick="sendMessage()">Gửi</button>
+            </div>
+        </div>
+        <div id="no-chat" class="no-chat-selected"><p>Vui lòng chọn một phiên hội thoại để bắt đầu.</p></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let currentChatId = null;
+        let chatMessagesStore = {};
+
+        // Thêm tài khoản bot mới qua API
+        async function addBotAccount() {
+            const tokenInput = document.getElementById('bot-token-input');
+            const token = tokenInput.value.trim();
+            if(!token) return alert('Vui lòng điền token hợp lệ!');
+            
+            const res = await fetch('/api/add-bot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token })
+            });
+            if(res.ok) {
+                tokenInput.value = '';
+                alert('Yêu cầu thêm bot đã được gửi, vui lòng đợi kết nối!');
+            }
+        }
+
+        // Nhận cập nhật danh sách bot đang chạy
+        socket.on('bot_list', (bots) => {
+            const container = document.getElementById('bot-list-container');
+            container.innerHTML = '';
+            bots.forEach(b => {
+                container.innerHTML += `
+                    <div class="bot-item" title="${b.token}">
+                        <span>🤖 ${b.tag.substring(0, 15)}...</span>
+                        <div class="status-dot ${b.status === 'online' ? 'online' : ''}"></div>
+                    </div>`;
+            });
+        });
+
+        socket.on('bot_status_update', () => socket.emit('get_bot_list_trigger_fallback_reconnect_simulated')); // auto reload on new status via real connection loop
+
+        // Nhận và render danh sách kênh chat từ các bot
+        socket.on('update_channels', (channels) => {
+            const listContainer = document.getElementById('channels');
+            listContainer.innerHTML = '';
+            channels.forEach(ch => {
+                const item = document.createElement('div');
+                item.className = `channel-item ${ch.id === currentChatId ? 'active' : ''}`;
+                item.onclick = () => {
+                    currentChatId = ch.id;
+                    document.getElementById('no-chat').style.display = 'none';
+                    document.getElementById('chat-active-container').style.display = 'flex';
+                    document.getElementById('current-channel-title').innerHTML = `💬 #${ch.name} <span class="bot-badge">Quản lý bởi: ${ch.botTag}</span>`;
+                    socket.emit('mark_as_read', ch.id);
+                    
+                    const chatMessages = document.getElementById('chat-messages');
+                    chatMessages.innerHTML = '';
+                    if (chatMessagesStore[ch.id]) {
+                        chatMessagesStore[ch.id].forEach(msg => renderMsg(msg, msg.isSelf));
+                    }
+                };
+                item.innerHTML = `<div class="channel-info"><div class="channel-name">${ch.name} <span class="bot-badge">${ch.botTag.split('#')[0]}</span></div><div class="channel-lastmsg">${ch.lastMessage}</div></div>${ch.unread && ch.id !== currentChatId ? '<div class="unread-dot"></div>' : ''}`;
+                listContainer.appendChild(item);
+            });
+        });
+
+        socket.on('discord_message', (data) => {
+            if (!chatMessagesStore[data.chatId]) chatMessagesStore[data.chatId] = [];
+            chatMessagesStore[data.chatId].push(data);
+            if (data.chatId === currentChatId) {
+                renderMsg(data, false);
+            }
+        });
+
+        function renderMsg(data, isSelf) {
+            const wrapper = document.createElement('div');
+            wrapper.className = `msg-wrapper ${isSelf ? 'self' : ''}`;
+            wrapper.innerHTML = `<div class="msg-box"><b>${isSelf ? 'Admin' : data.author}:</b> <div>${data.content}</div></div>`;
+            const box = document.getElementById('chat-messages');
+            box.appendChild(wrapper);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function fileSelected() {
+            const fileInput = document.getElementById('file-input');
+            if(fileInput.files.length > 0) {
+                document.getElementById('file-name-text').innerText = fileInput.files[0].name;
+                document.getElementById('file-preview').style.display = 'block';
+            }
+        }
+
+        function clearFile() {
+            document.getElementById('file-input').value = "";
+            document.getElementById('file-preview').style.display = 'none';
+        }
+
+        // Hàm xử lý gửi tin nhắn (Bao gồm cả Chữ, Ảnh hoặc File)
+        async function sendMessage() {
+            const input = document.getElementById('input-message');
+            const fileInput = document.getElementById('file-input');
+            const messageText = input.value.trim();
+            
+            if (!messageText && fileInput.files.length === 0) return;
+
+            // Nếu có đính kèm file, ta dùng API Upload multipart/form-data
+            if (fileInput.files.length > 0) {
+                const formData = new FormData();
+                formData.append('chatId', currentChatId);
+                formData.append('message', messageText);
+                formData.append('file', fileInput.files[0]);
+
+                // Render tạm trên giao diện web trước
+                const localMsg = { chatId: currentChatId, author: "Admin", content: (fileInput.files[0].name + " " + messageText).trim(), isSelf: true };
+                if (!chatMessagesStore[currentChatId]) chatMessagesStore[currentChatId] = [];
+                chatMessagesStore[currentChatId].push(localMsg);
+                renderMsg(localMsg, true);
+
+                input.value = '';
+                clearFile();
+
+                await fetch('/api/upload', { method: 'POST', body: formData });
+            } else {
+                // Nếu chỉ gửi chữ thông thường, bắn qua socket nhanh hơn
+                const msg = { chatId: currentChatId, author: "Admin", content: messageText, isSelf: true };
+                if (!chatMessagesStore[currentChatId]) chatMessagesStore[currentChatId] = [];
+                chatMessagesStore[currentChatId].push(msg);
+                renderMsg(msg, true);
+                
+                socket.emit('web_reply', { chatId: currentChatId, message: messageText });
+                input.value = '';
+            }
+        }
+    </script>
+</body>
+</html>
+
